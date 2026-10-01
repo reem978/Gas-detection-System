@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Smart Fire & Gas Detection System</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+    font-family: Arial, sans-serif;
+    background:#f4f6f9;
+    text-align:center;
+    padding:30px;
+}
+
+h1{
+    color:#333;
+}
+
+.container{
+    display:flex;
+    justify-content:center;
+    gap:20px;
+    flex-wrap:wrap;
+}
+
+.card{
+    background:white;
+    width:250px;
+    padding:20px;
+    border-radius:15px;
+    box-shadow:0px 4px 10px rgba(0,0,0,0.15);
+}
+
+.value{
+    font-size:32px;
+    font-weight:bold;
+}
+
+.safe{
+    color:green;
+}
+
+.danger{
+    color:red;
+}
+
+.chart-card{
+    background:white;
+    margin-top:30px;
+    padding:20px;
+    border-radius:15px;
+    box-shadow:0px 4px 10px rgba(0,0,0,0.15);
+    max-width:900px;
+    margin-left:auto;
+    margin-right:auto;
+}
+
+#lastUpdate{
+    margin-top:20px;
+    color:#666;
+}
+
+#logoutBtn{
+    padding:10px 20px;
+    border:none;
+    border-radius:10px;
+    cursor:pointer;
+    margin-bottom:20px;
+}
+
+</style>
+</head>
+<body>
+
+<button id="logoutBtn">Logout</button>
+
+<div style="font-size:60px;">
+🔥🛡️
+</div>
+
+<h1>Smart Fire & Gas Detection System</h1>
+
+<h4 style="color:#666;">
+IoT Monitoring Dashboard
+<br>
+Developed by Rim Hazimeh
+</h4>
+
+<h3 id="systemState" style="color:green;">
+🟢 System Online
+</h3>
+
+<h3 id="lastUpdate">Waiting for data...</h3>
+
+<div class="container">
+
+    <div class="card">
+        <h2>🌡 Temperature</h2>
+        <div class="value">
+            <span id="temp">--</span> °C
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>💨 Gas Value</h2>
+        <div class="value">
+            <span id="gas">--</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>⚠ Status</h2>
+        <div class="value" id="status">
+            Loading...
+        </div>
+    </div>
+
+</div>
+
+<div class="chart-card">
+    <h2>📈 Gas History</h2>
+    <canvas id="gasChart"></canvas>
+</div>
+
+<footer style="
+margin-top:40px;
+color:gray;
+font-size:14px;
+">
+© 2026 Smart Fire & Gas Detection System
+<br>
+Developed by Rim Hazimeh
+</footer>
+
+<script type="module">
+
+import { initializeApp }
+from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+import { getDatabase, ref, onValue }
+from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+import {
+    getAuth,
+    onAuthStateChanged,
+    signOut
+}
+from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyBMEPp7mA155eFLOU9BHraMjTtQGyG06BU",
+    authDomain: "smartfiresystem-587aa.firebaseapp.com",
+    databaseURL: "https://smartfiresystem-587aa-default-rtdb.firebaseio.com",
+    projectId: "smartfiresystem-587aa"
+};
+
+const app = initializeApp(firebaseConfig);
+
+const auth = getAuth(app);
+
+onAuthStateChanged(auth, (user) => {
+
+    if (!user)
+    {
+        window.location.href = "login.html";
+    }
+
+});
+
+document.getElementById("logoutBtn")
+.addEventListener("click", () => {
+
+    signOut(auth);
+
+});
+
+const db = getDatabase(app);
+
+const ctx = document.getElementById("gasChart");
+
+let gasChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'Gas Level',
+            data: [],
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true
+    }
+});
+
+onValue(ref(db,"SensorData/Temperature"), (snapshot) => {
+
+    document.getElementById("temp").innerHTML = snapshot.val();
+
+    updateTime();
+
+});
+
+onValue(ref(db,"SensorData/Gas"), (snapshot) => {
+
+    document.getElementById("gas").innerHTML = snapshot.val();
+
+    updateTime();
+
+});
+
+onValue(ref(db,"SensorData/Status"), (snapshot) => {
+
+    let status = snapshot.val();
+
+    let statusElement =
+    document.getElementById("status");
+
+    statusElement.innerHTML = status;
+
+    if(status === "Danger")
+    {
+        statusElement.className = "value danger";
+
+        document.body.style.background = "#ffe5e5";
+
+        document.getElementById("systemState").innerHTML =
+        "🔴 Danger Detected";
+
+        document.getElementById("systemState").style.color =
+        "red";
+    }
+    else
+    {
+        statusElement.className = "value safe";
+
+        document.body.style.background = "#f4f6f9";
+
+        document.getElementById("systemState").innerHTML =
+        "🟢 System Online";
+
+        document.getElementById("systemState").style.color =
+        "green";
+    }
+
+    updateTime();
+
+});
+
+onValue(ref(db,"History"), (snapshot) => {
+
+    let labels = [];
+    let gasValues = [];
+
+    let count = 0;
+
+    snapshot.forEach((child) => {
+
+        gasValues.push(child.val().Gas);
+
+        labels.push("R" + (++count));
+
+    });
+
+    if(gasValues.length > 20)
+    {
+        gasValues = gasValues.slice(-20);
+        labels = labels.slice(-20);
+    }
+
+    gasChart.data.labels = labels;
+    gasChart.data.datasets[0].data = gasValues;
+
+    gasChart.update();
+
+});
+
+function updateTime()
+{
+    const now = new Date();
+
+    document.getElementById("lastUpdate").innerHTML =
+    "Last Update: " + now.toLocaleString();
+}
+
+</script>
+
+</body>
